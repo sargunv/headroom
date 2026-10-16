@@ -5,8 +5,13 @@ import dev.sebastiano.headroom.model.ResetAttempt
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.time.Instant
+import kotlinx.serialization.builtins.serializer
 import okio.FileSystem
+import okio.ForwardingFileSystem
+import okio.Path
+import okio.Source
 
 class FileStoresTest {
     private val folder = TestDirectory()
@@ -14,6 +19,29 @@ class FileStoresTest {
     @AfterTest
     fun tearDown() {
         folder.close()
+    }
+
+    @Test
+    fun `storage filesystem is the platform system filesystem`() {
+        assertSame(FileSystem.SYSTEM, storageFileSystem())
+    }
+
+    @Test
+    fun `json files use the injected filesystem`() {
+        var reads = 0
+        val fileSystem =
+            object : ForwardingFileSystem(FileSystem.SYSTEM) {
+                override fun source(file: Path): Source {
+                    reads++
+                    return super.source(file)
+                }
+            }
+        val file = JsonFile(folder.path / "injected.json", String.serializer(), "", fileSystem)
+
+        file.write("stored value")
+
+        assertEquals("stored value", file.read())
+        assertEquals(1, reads)
     }
 
     @Test

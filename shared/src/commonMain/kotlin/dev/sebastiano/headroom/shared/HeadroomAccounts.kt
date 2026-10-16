@@ -57,7 +57,7 @@ internal constructor(
     /** Returns after storage finishes, for notification actions whose handler must await it. */
     @Throws(IOException::class, CancellationException::class)
     public suspend fun setAlertAndWait(accountId: String, windowId: String, enabled: Boolean) {
-        alerts.setEnabled(accountId, windowId, enabled)
+        scope.owned { alerts.setEnabled(accountId, windowId, enabled) }
     }
 
     /**

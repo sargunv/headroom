@@ -9,12 +9,15 @@
 | `:core:auth` | Kotlin Multiplatform (JVM, iOS) | OAuth (PKCE, loopback redirect, device code), API keys, token refresh, token store contract |
 | `:core:storage` | Kotlin Multiplatform (Android, JVM, iOS) | Room database (accounts, snapshots, history, reset events), DataStore settings, account fetching and sign-in bookkeeping |
 | `:core:data` | Android library | Encrypted token store, sync worker, reset alarms, notifications, the Android wiring (`DataGraph`) |
-| `:shared` | Kotlin Multiplatform (JVM, iOS) | The `HeadroomKit` framework for the iOS app: wiring, Keychain-backed token store, Swift-friendly view models |
-| `:core:designsystem` | Android library, Compose | Theme, quota indicators, provider avatars, shapes and motion specs |
+| `:shared` | Kotlin Multiplatform (JVM, iOS) | Shared application wiring and presentation, secure token-store adapter, and the `HeadroomKit` framework for iOS |
+| `:core:designsystem` | Kotlin Multiplatform (Android, JVM), Compose | Shared original theme, typography, quota indicators, provider avatars, shapes and motion; native font, color and shader adapters |
+| `:core:ui` | Kotlin Multiplatform (Android, JVM), Compose | Original screens, navigation, four ViewModels, presentation graph and resources; focused platform adapters |
 | `:widget` | Android library | Remote Compose widgets for the home screen and the lock screen |
-| `:app` | Android application | Screens, navigation, adaptive layouts, dependency wiring |
+| `:app` | Android application | Activity/application shell, Android wiring, widgets/tile/island integration and device adapters |
+| `:desktopApp` | JVM application, Compose Multiplatform | macOS menu-bar shell, shared-UI hosting, Keychain, notifications and Nucleus packaging |
 
-Dependencies point down: `:app` → `:widget`, `:core:designsystem`, `:core:data` →
+Dependencies point down: both app shells → `:core:ui` → `:core:designsystem`, `:core:model` and
+`:core:storage`. Android also uses `:widget` and `:core:data` →
 `:core:storage` → `:core:quota`, `:core:auth` → `:core:model`. `:widget` also uses `:core:designsystem`, for the
 colour palettes it shares with the app. The JVM modules have no Android dependencies, so their
 tests run fast on the JVM.
@@ -32,8 +35,8 @@ iOS. `:core:model`, `:core:quota`, `:core:auth` and `:core:storage` are multipla
 `:core:storage` uses `headroom.kmp.android.library`, which adds an Android target: Room and DataStore
 ship separate Android builds, and the Android app keeps Android's own SQLite and the same file names
 (`headroom.db`, `files/datastore/settings.preferences_pb`). iOS opens the same database with the
-SQLite that ships with Room. The JVM target only runs `commonTest` on the host, with that bundled
-SQLite. `HeadroomStorage` is the one public entry point; each platform opens it with its own
+SQLite that ships with Room. The JVM target uses that bundled SQLite for desktop production and
+host tests. `HeadroomStorage` is the one public entry point; each platform opens it with its own
 `openHeadroomStorage`. The sign-in state machine (`RealSignInController`, `AuthSignInSteps`) lives
 in `:core:storage` too, so both apps run the same sign-in steps.
 
@@ -46,6 +49,30 @@ String Catalog holds the text.
 
 The SwiftUI app lives in `iosApp/`; its [README](../iosApp/README.md) covers building, testing and
 how it fits together. Its Xcode project is generated from `iosApp/project.yml` with XcodeGen.
+
+The macOS app lives in `desktopApp/` and consumes `:shared` through its JVM target. `Headroom.data`
+exposes typed, lifetime-owned data ports from that same session. `DesktopPresentation` assembles
+the original `HeadroomUiGraph` and ViewModels over those ports; it does not reconstruct domain
+objects from the Swift-friendly UI models or open a second database/DataStore instance.
+
+Both shells render the original `HeadroomApp` in `:core:ui`. Its screens, resource text, state,
+navigation and effects have one common implementation. Android's `AppGraph` supplies its native
+collaborators; the Nucleus shell supplies a persistent ViewModel store, lifecycle/back hosting,
+native browser/clipboard callbacks and a macOS-only settings slot. Widget, tile and island
+settings are capability-gated rather than offered as failing desktop no-ops.
+
+The original shader source, uniform math and timing are common. Android compiles them with
+`RuntimeShader`; JVM uses Skia runtime effects and image filters. Common resources are also the
+canonical inputs for Android resource IDs. Generated Android-only lookup adapters map typed
+Compose resources to native IDs, so Android retains its original text formatting, escaping and
+vector loading; desktop uses Compose Resources with equivalent template formatting. These are
+real runtime lookups, not resource keep tables or Lint exclusions. The iOS SwiftUI app remains
+independent of these Compose UI modules.
+
+The desktop shell keeps its data session and presentation graph alive while the window is
+hidden, with a native status item as the entry point. Periodic sync, Keychain access, notifications
+and Nucleus stay in the desktop shell. Its [README](../desktopApp/README.md) covers the pinned
+development build, toolchain and packaging.
 
 The OAuth loopback listener (`LoopbackServer`) keeps its HTTP handling in common code, over a small
 socket interface: `ServerSocket` on the JVM and POSIX sockets on iOS, always bound to the loopback

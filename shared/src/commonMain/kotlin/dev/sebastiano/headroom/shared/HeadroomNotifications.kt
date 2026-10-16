@@ -10,6 +10,7 @@ import dev.sebastiano.headroom.model.SignInAlertPolicy
 import dev.sebastiano.headroom.model.WindowKind
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.datetime.TimeZone
@@ -80,6 +81,7 @@ internal constructor(
     private val alerts: AlertPreferences,
     private val clock: () -> Instant,
     private val zone: () -> TimeZone,
+    private val scope: CoroutineScope,
 ) {
     /**
      * The notifications to have scheduled now, for the real accounts. [signInNotified] and
@@ -88,11 +90,11 @@ internal constructor(
     public suspend fun plan(
         signInNotified: List<String>,
         reminded: List<String>,
-    ): NotificationPlanUi {
+    ): NotificationPlanUi = scope.owned {
         val accounts = sources.real.current()
         val now = clock()
         val alertStates = AlertStates.of(flowOf(accounts), alerts).first()
-        return NotificationPlanner.plan(
+        NotificationPlanner.plan(
             accounts = accounts,
             settings = settings.settings.first(),
             alerts = alertStates,

@@ -1,6 +1,5 @@
 package dev.sebastiano.headroom.shared
 
-import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AskOutcome
 import dev.sebastiano.headroom.model.Provider
@@ -16,7 +15,6 @@ import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.ResetRefresh
-import dev.sebastiano.headroom.signin.DeviceSession
 import dev.sebastiano.headroom.signin.ZCodeSignIn
 import dev.sebastiano.headroom.signin.ZCodeSignInState
 import kotlinx.coroutines.CoroutineScope
@@ -147,13 +145,11 @@ internal constructor(
     memory: ResetAttemptMemory,
     events: ResetEventLog,
     private val scope: CoroutineScope,
-    startZCode: suspend () -> DeviceSession,
-    saveZCode: suspend (accountId: String, tokens: TokenSet) -> Unit,
+    zCodeSignIn: ZCodeSignIn,
 ) {
     public val redeem: HeadroomRedeem = HeadroomRedeem(sources, provider, memory, events, scope)
 
-    public val zCode: HeadroomZCode =
-        HeadroomZCode(ZCodeSignIn(startZCode, saveZCode, scope), scope)
+    public val zCode: HeadroomZCode = HeadroomZCode(zCodeSignIn, scope)
 
     /** Calls [onChange] with the Resets tab now and at every change, until [Watch.cancel]. */
     public fun watchTab(onChange: (ResetsTabUi) -> Unit): Watch = scope.watch(tab(), onChange)

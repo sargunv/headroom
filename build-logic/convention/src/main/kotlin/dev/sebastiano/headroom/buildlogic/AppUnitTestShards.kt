@@ -5,13 +5,13 @@ import org.gradle.api.GradleException
 import org.gradle.api.Project
 import org.gradle.api.tasks.testing.Test
 
-/** Gradle property that selects which `:app` unit tests a CI shard runs. */
+/** Selects a CI shard for Android shell tests and the extracted shared UI's Android host tests. */
 internal const val APP_TEST_SHARD_PROPERTY = "headroom.appTestShard"
 
 /**
  * Restricts `:app` unit tests to one CI shard when [APP_TEST_SHARD_PROPERTY] is set.
  *
- * The shards partition every unit test class: redeem screenshot classes, the other
+ * The shards partition shell and shared UI test classes: redeem screenshot classes, the other
  * `*ScreenshotTest` classes, and everything else. A missing property runs the full suite, so a
  * local `./gradlew check` is unchanged. Unknown values fail configuration so a typo cannot skip
  * tests. Instrumented tests are not touched, because this only configures `unitTests`.

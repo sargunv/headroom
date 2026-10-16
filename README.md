@@ -4,6 +4,11 @@ Headroom is an Android app that shows how much of your AI subscription limits yo
 covers Claude, ChatGPT Codex, GitHub Copilot, Grok, Z.AI, Kimi Code, OpenCode Go, JetBrains AI and Muse.
 It has home screen and lock screen widgets, and it tells you when a weekly limit resets.
 
+A macOS desktop app in [`desktopApp/`](desktopApp/README.md) shares the Kotlin business logic.
+It stays in the menu bar, with a resizable dashboard, macOS Keychain sign-ins and background
+refresh. The desktop app currently builds from source using a pinned Nucleus 3.0 development
+release; the APK installation instructions below remain Android-specific.
+
 Headroom is free software under the [Apache License 2.0](LICENSE).
 
 <p align="center">
@@ -163,6 +168,8 @@ You need JDK 21 and the Android SDK with platform 37.
 
 The app needs Android 16 (API 36) or later.
 
+For macOS desktop development and packaging, see [desktopApp/README.md](desktopApp/README.md).
+
 ## Project layout
 
 | Module | What it holds |
@@ -170,10 +177,14 @@ The app needs Android 16 (API 36) or later.
 | `:core:model` | Quota types, pace maths, reset rules, repository contracts, demo data |
 | `:core:quota` | One fetcher per provider |
 | `:core:auth` | Sign-in flows, token refresh, token store contract |
+| `:core:storage` | Shared Room history, settings and account bookkeeping |
+| `:shared` | Shared application facade for iOS and desktop |
 | `:core:data` | Room history, sync, reset alarms, notifications, encrypted tokens |
-| `:core:designsystem` | Theme, type, quota indicators, charts |
+| `:core:designsystem` | Shared Android/JVM theme, type, quota indicators, charts and rendering adapters |
+| `:core:ui` | Original shared Compose screens, navigation and ViewModels |
 | `:widget` | Remote Compose widgets |
-| `:app` | Screens, navigation, adaptive layouts, wiring |
+| `:app` | Android shell, platform integrations and wiring |
+| `:desktopApp` | Shared-UI host, macOS menu-bar services and Nucleus packaging |
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how data flows between them.
 

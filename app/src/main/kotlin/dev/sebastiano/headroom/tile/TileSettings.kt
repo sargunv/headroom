@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * it in Settings. It is kept in shared preferences because the tile service reads it outside the
  * app's UI. A stored value the app no longer knows reads as the default.
  */
-class TileSettings(context: Context) {
+class TileSettings(context: Context) : TilePreferences {
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val state =
         MutableStateFlow(
@@ -21,9 +21,9 @@ class TileSettings(context: Context) {
             } ?: TileSubtitleMode.NextReset
         )
 
-    val subtitle: StateFlow<TileSubtitleMode> = state.asStateFlow()
+    override val subtitle: StateFlow<TileSubtitleMode> = state.asStateFlow()
 
-    fun setSubtitle(mode: TileSubtitleMode) {
+    override fun setSubtitle(mode: TileSubtitleMode) {
         prefs.edit { putString(KEY_SUBTITLE, mode.name) }
         state.value = mode
     }

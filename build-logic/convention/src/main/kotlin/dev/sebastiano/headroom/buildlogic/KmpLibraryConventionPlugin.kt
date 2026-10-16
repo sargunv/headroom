@@ -9,7 +9,7 @@ import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 /**
- * Kotlin Multiplatform module shared with the iOS app: no Android APIs, JVM and iOS targets.
+ * Kotlin Multiplatform module shared with the iOS and desktop apps: no Android APIs, JVM and iOS targets.
  * Tests live in `commonTest` and use `kotlin.test`, so they run on the JVM (JUnit 5) and on the iOS
  * simulator. The iOS targets only build on macOS; elsewhere Kotlin skips them.
  */

@@ -11,9 +11,9 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 /**
  * Kotlin Multiplatform module with an Android target as well, for code that uses Android-aware
- * libraries such as Room: the Android app gets the Android build of the library. The JVM target is
- * there for fast `commonTest` runs on the host; the Android target has no tests of its own. Set the
- * namespace in the module.
+ * libraries such as Room: the Android app gets the Android build of the library. The JVM target
+ * serves the desktop app and fast `commonTest` runs on the host; the Android target has no tests
+ * of its own. Set the namespace in the module.
  */
 class KmpAndroidLibraryConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) =

@@ -10,6 +10,11 @@ screens, and a notification when a weekly limit resets.
 - Android 16 (API 36) and later only. `compileSdk` and `targetSdk` are 37.
 - An iOS app (SwiftUI, iOS 18 and later) in `iosApp/` shares the Kotlin business logic through
   Kotlin Multiplatform. See [iosApp/README.md](iosApp/README.md).
+- A macOS menu-bar app in `desktopApp/` uses the JVM targets, Compose Multiplatform and Nucleus.
+  See [desktopApp/README.md](desktopApp/README.md). Close hides its window; Quit stops the app.
+- Android and desktop share the original screens and ViewModels in `:core:ui` and the original
+  components in `:core:designsystem`. Keep platform imports in their Android/JVM adapters and
+  app shells; do not introduce a second desktop presentation implementation.
 - Kotlin, Jetpack Compose, Material 3 Expressive, Remote Compose. No Views, no Glance.
 - Plain constructor injection. There is no DI framework.
 
@@ -57,3 +62,7 @@ tokens are stored encrypted on the device and excluded from backup.
 
 Use JDK 21. `./gradlew check` is the local gate and the CI gate. See the docs above for the
 individual tasks.
+
+Local host tooling can be pinned in the gitignored `mise.local.toml`. Run Gradle through
+`mise exec -- ./gradlew` when the JDK is managed by mise. Desktop runtime dependencies stay in
+`:desktopApp`; do not introduce Nucleus or macOS APIs into common business logic.

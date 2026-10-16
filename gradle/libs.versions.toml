@@ -1,11 +1,16 @@
 [versions]
 agp = "9.4.1"
 playPublisher = "4.1.1"
-kotlin = "2.4.0"
+kotlin = "2.4.20"
 ksp = "2.3.12"
 detekt = "2.0.0-alpha.6"
 composeRules = "0.6.7"
 ktfmt = "0.27.0"
+nucleus = "3.0.0-dev-202610132318"
+composeMultiplatform = "1.12.1"
+desktopMaterial3 = "1.12.0-alpha03"
+nativeTray = "2.1.6"
+jna = "5.19.1"
 roborazzi = "1.75.0"
 
 composeBom = "2026.09.00"
@@ -53,6 +58,25 @@ uiautomator = "2.4.0"
 concurrentFutures = "1.2.0"
 
 [libraries]
+desktop-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "desktopMaterial3" }
+desktop-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "composeMultiplatform" }
+cmp-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMultiplatform" }
+cmp-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "composeMultiplatform" }
+cmp-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMultiplatform" }
+cmp-ui-graphics = { module = "org.jetbrains.compose.ui:ui-graphics", version.ref = "composeMultiplatform" }
+cmp-animation = { module = "org.jetbrains.compose.animation:animation", version.ref = "composeMultiplatform" }
+cmp-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeMultiplatform" }
+cmp-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "desktopMaterial3" }
+cmp-material3-navigationSuite = { module = "org.jetbrains.compose.material3:material3-adaptive-navigation-suite", version.ref = "desktopMaterial3" }
+cmp-adaptive = { module = "org.jetbrains.compose.material3.adaptive:adaptive", version.ref = "material3Adaptive" }
+cmp-adaptive-layout = { module = "org.jetbrains.compose.material3.adaptive:adaptive-layout", version.ref = "material3Adaptive" }
+cmp-adaptive-navigation = { module = "org.jetbrains.compose.material3.adaptive:adaptive-navigation", version.ref = "material3Adaptive" }
+nucleus-application = { module = "dev.nucleusframework:nucleus.nucleus-application", version.ref = "nucleus" }
+nucleus-tray = { module = "dev.nucleusframework:composenativetray", version.ref = "nativeTray" }
+nucleus-notifications-common = { module = "dev.nucleusframework:nucleus.notification-common", version.ref = "nucleus" }
+nucleus-notifications-macos = { module = "dev.nucleusframework:nucleus.notification-macos", version.ref = "nucleus" }
+nucleus-autolaunch = { module = "dev.nucleusframework:nucleus.autolaunch", version.ref = "nucleus" }
+jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 androidx-tracing = { module = "androidx.tracing:tracing", version.ref = "tracing" }
 androidx-tracing-wire = { module = "androidx.tracing:tracing-wire", version.ref = "tracing" }
 compose-runtime-annotation = { module = "androidx.compose.runtime:runtime-annotation", version.ref = "composeRuntimeAnnotation" }
@@ -92,6 +116,8 @@ androidx-activity-compose = { module = "androidx.activity:activity-compose", ver
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-savedstate = { module = "androidx.lifecycle:lifecycle-viewmodel-savedstate", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "lifecycle" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
@@ -146,8 +172,11 @@ androidx-concurrent-futures = { module = "androidx.concurrent:concurrent-futures
 androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "uiautomator" }
 
 [plugins]
+jetbrains-compose = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
+nucleus = { id = "dev.nucleusframework", version.ref = "nucleus" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
+android-kmp-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 android-lint = { id = "com.android.lint", version.ref = "agp" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
@@ -165,6 +194,7 @@ aboutlibraries = { id = "com.mikepenz.aboutlibraries.plugin", version.ref = "abo
 headroom-jvm-library = { id = "headroom.jvm.library" }
 headroom-kmp-library = { id = "headroom.kmp.library" }
 headroom-kmp-android-library = { id = "headroom.kmp.android.library" }
+headroom-kmp-compose-library = { id = "headroom.kmp.compose.library" }
 headroom-android-library = { id = "headroom.android.library" }
 headroom-android-application = { id = "headroom.android.application" }
 headroom-android-compose = { id = "headroom.android.compose" }

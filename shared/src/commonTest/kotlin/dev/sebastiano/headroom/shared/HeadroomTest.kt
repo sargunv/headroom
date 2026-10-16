@@ -38,7 +38,10 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -50,6 +53,8 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.TimeZone
 import kotlinx.io.IOException
 
@@ -141,6 +146,114 @@ class HeadroomTest {
 
         assertEquals(listOf<String?>(null), repository.refreshes)
     }
+
+    @Test
+    fun `closing cancels a background refresh requested from an external scope`() = runTest {
+        val lifetime = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        val waiting =
+            MemoryAccountsRepository().apply {
+                add(Account("a", Provider.Claude, "fixture@example.com"))
+                refreshGate = CompletableDeferred()
+            }
+        var closed = false
+        val opened =
+            Headroom(
+                HeadroomParts(
+                    repository = waiting,
+                    tokenStore = InMemoryTokenStore(),
+                    signInSteps = ApiKeySteps,
+                    settings = settings,
+                    alerts = alerts,
+                    onClose = { closed = true },
+                ),
+                lifetime,
+            )
+        val refresh = launch { opened.refreshAll() }
+        runCurrent()
+        opened.closeAndJoin()
+        runCurrent()
+        try {
+            assertTrue(closed)
+            assertFalse(refresh.isActive, "The refresh must stop before storage closes")
+        } finally {
+            refresh.cancel()
+        }
+    }
+
+    @Test
+    fun `closing waits for externally awaited notification read cleanup`() = runTest {
+        val lifetime = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        val events = mutableListOf<String>()
+        val opened = headroomWithClose(lifetime) { events += "closed" }
+        runCurrent()
+        repository.readGate = CompletableDeferred()
+        val cleanup = CompletableDeferred<Unit>()
+        repository.afterRead = {
+            withContext(NonCancellable) {
+                cleanup.await()
+                events += "read stopped"
+            }
+        }
+        val reading = launch { opened.notifications.plan(emptyList(), emptyList()) }
+        runCurrent()
+        val closing = launch { opened.closeAndJoin() }
+        runCurrent()
+        try {
+            assertTrue(events.isEmpty(), "Storage must remain open until read cleanup finishes")
+            assertTrue(closing.isActive)
+            cleanup.complete(Unit)
+            runCurrent()
+            assertEquals(listOf("read stopped", "closed"), events)
+            assertTrue(reading.isCancelled)
+        } finally {
+            cleanup.complete(Unit)
+            reading.cancel()
+        }
+    }
+
+    @Test
+    fun `closing waits for externally awaited alert write cleanup`() = runTest {
+        val lifetime = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        val events = mutableListOf<String>()
+        val opened = headroomWithClose(lifetime) { events += "closed" }
+        runCurrent()
+        alerts.writeGate = CompletableDeferred()
+        val cleanup = CompletableDeferred<Unit>()
+        alerts.afterWrite = {
+            withContext(NonCancellable) {
+                cleanup.await()
+                events += "write stopped"
+            }
+        }
+        val writing = launch { opened.accounts.setAlertAndWait("a", "weekly", false) }
+        runCurrent()
+        val closing = launch { opened.closeAndJoin() }
+        runCurrent()
+        try {
+            assertTrue(events.isEmpty(), "Storage must remain open until write cleanup finishes")
+            assertTrue(closing.isActive)
+            cleanup.complete(Unit)
+            runCurrent()
+            assertEquals(listOf("write stopped", "closed"), events)
+            assertTrue(writing.isCancelled)
+        } finally {
+            cleanup.complete(Unit)
+            writing.cancel()
+        }
+    }
+
+    private fun headroomWithClose(lifetime: CoroutineScope, onClose: () -> Unit): Headroom =
+        Headroom(
+            HeadroomParts(
+                repository = repository,
+                tokenStore = InMemoryTokenStore(),
+                signInSteps = ApiKeySteps,
+                settings = settings,
+                alerts = alerts,
+                onClose = onClose,
+            ),
+            lifetime,
+        )
 
     @Test
     fun `stored accounts not read yet show no demo`() {
@@ -437,10 +550,16 @@ private class MemoryAccountsRepository : AccountsRepository {
     /** What storage holds when [accounts] has not published it yet, as Room does at first. */
     var stored: List<AccountState>? = null
     var readGate: CompletableDeferred<Unit>? = null
+    var refreshGate: CompletableDeferred<Unit>? = null
+    var afterRead: suspend () -> Unit = {}
 
     override suspend fun current(): List<AccountState> {
-        readGate?.await()
-        return stored ?: accounts.value
+        try {
+            readGate?.await()
+            return stored ?: accounts.value
+        } finally {
+            afterRead()
+        }
     }
 
     fun add(account: Account) {
@@ -461,6 +580,7 @@ private class MemoryAccountsRepository : AccountsRepository {
 
     override suspend fun refresh(accountId: String?) {
         refreshes += accountId
+        refreshGate?.await()
     }
 
     override fun history(accountId: String, windowId: String): Flow<List<UsagePoint>> =
@@ -476,6 +596,7 @@ private class RefusingTokenStore(private val store: TokenStore = InMemoryTokenSt
 /** Alert switches in memory. */
 private class MemoryAlertPreferences : AlertPreferences {
     var writeGate: CompletableDeferred<Unit>? = null
+    var afterWrite: suspend () -> Unit = {}
     private val switches = MutableStateFlow(emptyMap<Pair<String, String>, Boolean>())
 
     override fun isEnabled(accountId: String, window: QuotaWindow): Flow<Boolean> = switches.map {
@@ -483,8 +604,12 @@ private class MemoryAlertPreferences : AlertPreferences {
     }
 
     override suspend fun setEnabled(accountId: String, windowId: String, enabled: Boolean) {
-        writeGate?.await()
-        switches.update { it + ((accountId to windowId) to enabled) }
+        try {
+            writeGate?.await()
+            switches.update { it + ((accountId to windowId) to enabled) }
+        } finally {
+            afterWrite()
+        }
     }
 }
 

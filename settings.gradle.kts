@@ -25,7 +25,9 @@ include(
     ":core:data",
     ":core:storage",
     ":shared",
+    ":desktopApp",
     ":core:designsystem",
+    ":core:ui",
     ":widget",
 )
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")

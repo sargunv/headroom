@@ -11,7 +11,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.core.content.edit
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -22,6 +24,7 @@ import dev.sebastiano.headroom.ui.HeadroomApp
 import dev.sebastiano.headroom.ui.OpenAccountRequest
 import dev.sebastiano.headroom.ui.ThemeRevealHost
 import dev.sebastiano.headroom.ui.delights.DelightsHost
+import dev.sebastiano.headroom.ui.platform.LocalUiPlatform
 import dev.sebastiano.headroom.widget.WidgetIntents
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -49,27 +52,30 @@ class MainActivity : ComponentActivity() {
         val settings = graph.settings.settings.stateIn(lifecycleScope, SharingStarted.Eagerly, null)
         keepSplashUntil { settings.value != null }
         setContent {
-            val request by openAccount.collectAsStateWithLifecycle()
-            val tileSettingsRequest by openTileSettings.collectAsStateWithLifecycle()
-            val appearance by settings.collectAsStateWithLifecycle()
-            // Nothing is drawn until the stored appearance is read, so the first frame already
-            // has the chosen theme and colours.
-            appearance?.let { current ->
-                // A new theme or palette is uncovered from where the user picked it.
-                ThemeRevealHost(themeKey = current.theme to current.palette) {
-                    AppearanceTheme(current) {
-                        // The delights draw over the whole app, in the chosen theme's colours.
-                        DelightsHost(
-                            refreshShimmer = current.refreshShimmer,
-                            resetConfetti = current.resetConfetti,
-                        ) {
-                            HeadroomApp(
-                                graph = graph,
-                                openAccountRequest = request,
-                                onConsumeOpenAccount = { openAccount.value = null },
-                                openTileSettingsRequest = tileSettingsRequest,
-                                onConsumeOpenTileSettings = { openTileSettings.value = null },
-                            )
+            val platform = remember { AndroidUiPlatform(this@MainActivity) }
+            CompositionLocalProvider(LocalUiPlatform provides platform) {
+                val request by openAccount.collectAsStateWithLifecycle()
+                val tileSettingsRequest by openTileSettings.collectAsStateWithLifecycle()
+                val appearance by settings.collectAsStateWithLifecycle()
+                // Nothing is drawn until the stored appearance is read, so the first frame already
+                // has the chosen theme and colours.
+                appearance?.let { current ->
+                    // A new theme or palette is uncovered from where the user picked it.
+                    ThemeRevealHost(themeKey = current.theme to current.palette) {
+                        AppearanceTheme(current) {
+                            // The delights draw over the whole app, in the chosen theme's colours.
+                            DelightsHost(
+                                refreshShimmer = current.refreshShimmer,
+                                resetConfetti = current.resetConfetti,
+                            ) {
+                                HeadroomApp(
+                                    graph = graph,
+                                    openAccountRequest = request,
+                                    onConsumeOpenAccount = { openAccount.value = null },
+                                    openTileSettingsRequest = tileSettingsRequest,
+                                    onConsumeOpenTileSettings = { openTileSettings.value = null },
+                                )
+                            }
                         }
                     }
                 }

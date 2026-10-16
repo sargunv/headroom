@@ -24,7 +24,7 @@ internal class JsonFile<T>(
     private val path: Path,
     private val serializer: KSerializer<T>,
     private val empty: T,
-    private val fileSystem: FileSystem = FileSystem.SYSTEM,
+    private val fileSystem: FileSystem = storageFileSystem(),
 ) {
     fun read(): T =
         try {

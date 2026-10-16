@@ -10,6 +10,7 @@ dependencies {
     compileOnly(libs.compose.gradlePlugin)
     compileOnly(libs.detekt.gradlePlugin)
     compileOnly(libs.ktfmt.gradlePlugin)
+    testImplementation(libs.junit4)
 }
 
 gradlePlugin {
@@ -27,9 +28,15 @@ gradlePlugin {
             implementationClass =
                 "dev.sebastiano.headroom.buildlogic.KmpAndroidLibraryConventionPlugin"
         }
+        register("kmpComposeLibrary") {
+            id = "headroom.kmp.compose.library"
+            implementationClass =
+                "dev.sebastiano.headroom.buildlogic.KmpComposeLibraryConventionPlugin"
+        }
         register("androidLibrary") {
             id = "headroom.android.library"
-            implementationClass = "dev.sebastiano.headroom.buildlogic.AndroidLibraryConventionPlugin"
+            implementationClass =
+                "dev.sebastiano.headroom.buildlogic.AndroidLibraryConventionPlugin"
         }
         register("androidApplication") {
             id = "headroom.android.application"
@@ -38,7 +45,8 @@ gradlePlugin {
         }
         register("androidCompose") {
             id = "headroom.android.compose"
-            implementationClass = "dev.sebastiano.headroom.buildlogic.AndroidComposeConventionPlugin"
+            implementationClass =
+                "dev.sebastiano.headroom.buildlogic.AndroidComposeConventionPlugin"
         }
     }
 }

@@ -16,8 +16,11 @@
 | Multiplatform tests | `src/commonTest` in multiplatform modules | JVM, JUnit 5 | `./gradlew :core:model:jvmTest` |
 | Multiplatform tests | `src/commonTest` in multiplatform modules | iOS simulator (macOS only) | `./gradlew :core:model:iosSimulatorArm64Test` |
 | iOS app tests | `iosApp/HeadroomTests`, `iosApp/HeadroomUITests` | iOS simulator (macOS only) | `iosApp/scripts/test.sh` |
+| Desktop tests | `desktopApp/src/test` | JVM, JUnit 5, fake macOS adapters | `./gradlew :desktopApp:test` |
 | Android unit tests | `src/test` in Android modules | JVM with Robolectric, JUnit 4 | `./gradlew :core:data:testDebugUnitTest` |
-| Compose UI tests | `src/test` in `:app` and `:core:designsystem` | Robolectric | `./gradlew :app:testDebugUnitTest` |
+| Common presentation tests | `:core:ui/src/commonTest` | JVM, JUnit 5 | `./gradlew :core:ui:jvmTest` |
+| Shared Compose Android tests | `:core:ui/src/androidHostTest`, `:core:designsystem/src/test` | Robolectric, JUnit 4 | `./gradlew :core:ui:testAndroidHostTest :core:designsystem:testAndroidHostTest` |
+| Android shell/UI integration tests | `:app/src/test` | Robolectric | `./gradlew :app:testDebugUnitTest` |
 | Screenshots | `src/test`, Roborazzi | Robolectric | `./gradlew :app:recordRoborazziDebug` |
 | End-to-end tests | `src/androidTest` in `:app` | Emulator, fake data | `./gradlew :app:pixel9api37DebugAndroidTest` |
 | Release smoke test | `scripts/release-smoke-test.sh` | Emulator, demo data, minified APK | See [RELEASING.md](RELEASING.md#the-smoke-test) |
@@ -28,6 +31,14 @@
 `java.*` APIs. Kotlin/Native does not allow commas in function names, so backticked test names
 leave them out. `./gradlew check` runs the iOS simulator tests on macOS and skips them elsewhere;
 CI runs them in a macOS job.
+
+The Compose UI modules intentionally target Android and JVM only. Their common tests run on
+both JVM and Android host targets; Android host tests keep JUnit 4/Robolectric, and JVM tests use
+JUnit 5. This does not add Compose or new UI targets to the iOS framework.
+
+CI's existing `headroom.appTestShard` partition covers both Android shell tests and the shared
+UI's host tests. Redeem screenshots now run in `:core:ui`; the remaining screenshot/unit shards
+run both modules. Design-system host tests run with the library tests.
 
 ### Fixtures, not live services
 

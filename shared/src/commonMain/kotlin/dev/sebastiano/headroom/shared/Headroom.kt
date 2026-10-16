@@ -7,6 +7,7 @@ import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.NoResets
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.ResetAttemptMemory
+import dev.sebastiano.headroom.model.ResetAttemptStore
 import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.SettingsRepository
@@ -14,6 +15,7 @@ import dev.sebastiano.headroom.signin.DeviceSession
 import dev.sebastiano.headroom.signin.RealSignInController
 import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.signin.SignInSteps
+import dev.sebastiano.headroom.signin.ZCodeSignIn
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -22,6 +24,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -41,7 +44,8 @@ internal class HeadroomParts(
     val alerts: AlertPreferences,
     val resetEvents: ResetEventLog = ResetEventLog.None,
     val resetProvider: ResetProvider = NoResets,
-    val resetMemory: ResetAttemptMemory = ResetAttemptMemory(),
+    val resetAttempts: ResetAttemptStore = ResetAttemptStore.None,
+    val resetMemory: ResetAttemptMemory = ResetAttemptMemory(store = resetAttempts),
     val startZCode: suspend () -> DeviceSession = { error("No ZCode sign-in here") },
     val clock: () -> Instant = Clock.System::now,
     val zone: () -> TimeZone = TimeZone::currentSystemDefault,
@@ -66,21 +70,35 @@ internal constructor(parts: HeadroomParts, private val scope: CoroutineScope) {
     private val alertPreferences = parts.alerts
     private val settingsRepository = parts.settings
     private val onClose = parts.onClose
+    private val lifetime = checkNotNull(scope.coroutineContext[Job])
     private val delights = Delights(sources.accounts, clock(), scope)
 
-    /** Adding an account, or signing one in again. */
-    public val signIn: HeadroomSignIn =
-        HeadroomSignIn(
-            RealSignInController(
-                steps = parts.signInSteps,
-                scope = scope,
-                completeAgain = { accountId, tokens ->
-                    signInManager.reauthenticate(accountId, tokens)
-                },
-                complete = { tokens -> signInManager.complete(tokens) },
-            ),
-            scope,
+    private val signInController =
+        RealSignInController(
+            steps = parts.signInSteps,
+            scope = scope,
+            completeAgain = { accountId, tokens ->
+                signInManager.reauthenticate(accountId, tokens)
+            },
+            complete = { tokens -> signInManager.complete(tokens) },
         )
+
+    private val zCodeSignIn =
+        ZCodeSignIn(
+            start = parts.startZCode,
+            save = { accountId, tokens ->
+                signInManager.signInToZCode(accountId, tokens)
+                sources.refresh(accountId)
+            },
+            scope = scope,
+        )
+
+    /** Raw business ports for native Kotlin UI graphs, sharing this session and its lifetime. */
+    public val data: HeadroomData =
+        HeadroomData(parts, signInManager, signInController, zCodeSignIn, scope)
+
+    /** Adding an account, or signing one in again. */
+    public val signIn: HeadroomSignIn = HeadroomSignIn(signInController, scope)
 
     /** Every provider, in the order the Android app lists them, with how each signs in. */
     public val providers: List<ProviderUi> = providersFor(parts.signInSteps)
@@ -101,15 +119,20 @@ internal constructor(parts: HeadroomParts, private val scope: CoroutineScope) {
             memory = parts.resetMemory,
             events = parts.resetEvents,
             scope = scope,
-            startZCode = parts.startZCode,
-            saveZCode = { accountId, tokens ->
-                signInManager.signInToZCode(accountId, tokens)
-                sources.refresh(accountId)
-            },
+            zCodeSignIn = zCodeSignIn,
         )
 
     public val notifications: HeadroomNotifications =
-        HeadroomNotifications(sources, parts.settings, parts.alerts, clock, parts.zone)
+        HeadroomNotifications(sources, parts.settings, parts.alerts, clock, parts.zone, scope)
+
+    /** Checks real provider resets before desktop notifications, unlike iOS's predicted plan. */
+    public val resetChecks: HeadroomResetChecks =
+        HeadroomResetChecks(parts.repository, parts.alerts, clock, scope)
+
+    init {
+        // Room must outlive every collector and DataStore write started by this instance.
+        lifetime.invokeOnCompletion { onClose() }
+    }
 
     /** Calls [onChange] with the overview now and whenever it changes, until [Watch.cancel]. */
     public fun watchOverview(onChange: (OverviewUi) -> Unit): Watch =
@@ -132,14 +155,19 @@ internal constructor(parts: HeadroomParts, private val scope: CoroutineScope) {
      * it leaves the demo accounts alone, as the Android app's background refresh does.
      */
     public suspend fun refreshAll() {
-        sources.real.refresh(accountId = null)
+        scope.owned { sources.real.refresh(accountId = null) }
     }
 
     /** Stops everything this instance started. */
     public fun close() {
         signIn.cancel()
         scope.cancel()
-        onClose()
+    }
+
+    /** Cancels this instance and waits for its jobs and storage to close before returning. */
+    public suspend fun closeAndJoin() {
+        close()
+        lifetime.join()
     }
 
     /**
@@ -217,3 +245,13 @@ public class Watch internal constructor(private val job: Job) {
 
 internal fun <T> CoroutineScope.watch(flow: Flow<T>, onChange: (T) -> Unit): Watch =
     Watch(launch { flow.collect { onChange(it) } })
+
+/** Awaited platform work belongs to this instance too, and stops when either owner cancels. */
+internal suspend fun <T> CoroutineScope.owned(block: suspend () -> T): T {
+    val work = async { block() }
+    return try {
+        work.await()
+    } finally {
+        work.cancel()
+    }
+}

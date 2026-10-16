@@ -16,11 +16,11 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(projects.core.model)
-            implementation(projects.core.auth)
+            api(projects.core.model)
+            api(projects.core.auth)
             implementation(projects.core.quota)
-            implementation(projects.core.storage)
-            implementation(libs.kotlinx.coroutines.core)
+            api(projects.core.storage)
+            api(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.io.core)
             implementation(libs.kotlinx.atomicfu)
             implementation(libs.kotlinx.datetime)

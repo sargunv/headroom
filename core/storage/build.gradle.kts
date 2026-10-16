@@ -23,6 +23,7 @@ kotlin {
             implementation(libs.okio)
         }
         androidMain.dependencies { implementation(libs.androidx.datastore.preferences) }
+        jvmMain.dependencies { implementation(libs.androidx.sqlite.bundled) }
         iosMain.dependencies { implementation(libs.androidx.sqlite.bundled) }
         commonTest.dependencies {
             implementation(libs.androidx.sqlite.bundled)

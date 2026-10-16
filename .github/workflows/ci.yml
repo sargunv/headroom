@@ -57,7 +57,7 @@ jobs:
           scripts/ci-resources.sh 30 &
           resources=$!
           trap 'kill "$resources"' EXIT
-          ./gradlew check -x test -x testDebugUnitTest -x allTests --continue
+          ./gradlew check -x test -x testDebugUnitTest -x testAndroidHostTest -x allTests --continue
 
       - name: Upload reports
         if: always()
@@ -89,7 +89,7 @@ jobs:
           scripts/ci-resources.sh 30 &
           resources=$!
           trap 'kill "$resources"' EXIT
-          ./gradlew test jvmTest -x :app:test -x :app:testDebugUnitTest --continue
+          ./gradlew test jvmTest :core:designsystem:testAndroidHostTest -x :app:test -x :app:testDebugUnitTest -x :core:ui:testAndroidHostTest --continue
 
       - name: Upload reports
         if: always()
@@ -99,6 +99,45 @@ jobs:
           path: |
             **/build/reports/
             **/build/test-results/
+          retention-days: 7
+
+  desktop-macos:
+    name: Desktop macOS (tests and package)
+    needs: changes
+    if: needs.changes.outputs.tests == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up CI
+        uses: ./.github/actions/setup-ci
+        with:
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Set up installer tooling
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24.22.0"
+
+      - name: Check and package desktop app
+        run: ./gradlew :desktopApp:check :desktopApp:packageDmg --continue
+
+      - name: Upload unsigned desktop package
+        uses: actions/upload-artifact@v5
+        with:
+          name: headroom-macos-unsigned
+          path: desktopApp/build/**/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: desktop-macos-reports
+          path: desktopApp/build/reports/
           retention-days: 7
 
   ios-tests:
@@ -169,8 +208,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Partition of every :app unit test. Filters live in build-logic (headroom.appTestShard).
-        shard: [redeem-screenshots, screenshots, unit]
+        # Preserve the original partition after moving presentation tests into :core:ui.
+        include:
+          - shard: redeem-screenshots
+            tasks: ":core:ui:testAndroidHostTest"
+          - shard: screenshots
+            tasks: ":app:test :core:ui:testAndroidHostTest"
+          - shard: unit
+            tasks: ":app:test :core:ui:testAndroidHostTest"
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -185,7 +230,7 @@ jobs:
           scripts/ci-resources.sh 30 &
           resources=$!
           trap 'kill "$resources"' EXIT
-          ./gradlew :app:test -Pheadroom.appTestShard=${{ matrix.shard }} --continue
+          ./gradlew ${{ matrix.tasks }} -Pheadroom.appTestShard=${{ matrix.shard }} --continue
 
       - name: Upload reports
         if: always()

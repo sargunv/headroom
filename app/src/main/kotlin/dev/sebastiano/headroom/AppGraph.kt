@@ -3,10 +3,6 @@ package dev.sebastiano.headroom
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.createSavedStateHandle
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.sebastiano.headroom.appdata.DemoAwareResetEvents
 import dev.sebastiano.headroom.appdata.DemoAwareResetHistory
 import dev.sebastiano.headroom.appdata.DemoAwareUsageHistory
@@ -18,7 +14,6 @@ import dev.sebastiano.headroom.appdata.HistoryResetHistory
 import dev.sebastiano.headroom.appdata.InMemoryAlertPreferences
 import dev.sebastiano.headroom.appdata.RealOrDemoResetProvider
 import dev.sebastiano.headroom.appdata.RepositoryUsageHistory
-import dev.sebastiano.headroom.appdata.ResetCenter
 import dev.sebastiano.headroom.appdata.ResetHistory
 import dev.sebastiano.headroom.appdata.UsageHistory
 import dev.sebastiano.headroom.data.DataGraph
@@ -29,7 +24,6 @@ import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.NoResets
 import dev.sebastiano.headroom.model.QuotaRepository
-import dev.sebastiano.headroom.model.ResetAttemptMemory
 import dev.sebastiano.headroom.model.ResetAttemptStore
 import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetProvider
@@ -44,10 +38,6 @@ import dev.sebastiano.headroom.signin.ZCodeSignIn
 import dev.sebastiano.headroom.tile.StatusBarTileAdder
 import dev.sebastiano.headroom.tile.TileAdder
 import dev.sebastiano.headroom.tile.TileSettings
-import dev.sebastiano.headroom.ui.accounts.AccountsViewModel
-import dev.sebastiano.headroom.ui.home.HomeViewModel
-import dev.sebastiano.headroom.ui.settings.SettingsViewModel
-import dev.sebastiano.headroom.ui.stats.StatsViewModel
 import dev.sebastiano.headroom.widget.HeadroomWidgetProvider
 import dev.sebastiano.headroom.widgets.AppWidgetManagerPinner
 import dev.sebastiano.headroom.widgets.WidgetPinner
@@ -63,8 +53,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
+import kotlinx.datetime.TimeZone
 
 /**
  * The app's object graph, built once by [HeadroomApplication]. There is no DI framework: every
@@ -86,113 +75,80 @@ import kotlinx.coroutines.flow.map
  * - [tileAdder]: asks the system to add the Quick Settings tile.
  */
 class AppGraph(
-    val quotaRepository: QuotaRepository,
-    val isDemo: StateFlow<Boolean>,
+    quotaRepository: QuotaRepository,
+    isDemo: StateFlow<Boolean>,
     /** True once the stored accounts have been read, so an empty list really means none. */
-    val accountsLoaded: StateFlow<Boolean>,
-    val alertPreferences: AlertPreferences,
-    val clock: () -> Instant,
-    val zone: ZoneId,
-    val signInController: SignInController,
-    val widgetPinner: WidgetPinner,
-    val resetHistory: ResetHistory,
+    accountsLoaded: StateFlow<Boolean>,
+    alertPreferences: AlertPreferences,
+    clock: () -> Instant,
+    zone: ZoneId,
+    signInController: SignInController,
+    widgetPinner: WidgetPinner,
+    resetHistory: ResetHistory,
     /** Stores the name the user gives an account. Does nothing without the data layer. */
-    val renameAccount: suspend (accountId: String, name: String?) -> Unit = { _, _ -> },
+    renameAccount: suspend (accountId: String, name: String?) -> Unit = { _, _ -> },
     /** Signs an account out and forgets it. Does nothing without the data layer. */
-    val removeAccount: suspend (accountId: String) -> Unit = {},
+    removeAccount: suspend (accountId: String) -> Unit = {},
     /** Stores the order the user put the accounts in. Does nothing without the data layer. */
-    val reorderAccounts: suspend (orderedIds: List<String>) -> Unit = {},
+    reorderAccounts: suspend (orderedIds: List<String>) -> Unit = {},
     /** How often countdowns re-read the clock. Null turns it off, for tests with a fixed clock. */
-    val tickInterval: Duration? = 1.minutes,
+    tickInterval: Duration? = 1.minutes,
     /** Used or left, how often to sync in the background, and how the overview sorts accounts. */
-    val settings: SettingsRepository = InMemorySettingsRepository(),
+    settings: SettingsRepository = InMemorySettingsRepository(),
     /** The version name the settings screen shows. */
-    val appVersion: String = "",
+    appVersion: String = "",
     /** The usage history the Stats tab is computed from. */
-    val usageHistory: UsageHistory = RepositoryUsageHistory(quotaRepository),
+    usageHistory: UsageHistory = RepositoryUsageHistory(quotaRepository),
     /** Where the stats are computed: off the main thread, as they read weeks of history. */
-    val statsDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    statsDispatcher: CoroutineDispatcher = Dispatchers.Default,
     /** The reset island: its accessibility service's state, and the Try button. */
-    val resetIsland: ResetIslandAccess = ResetIslandAccess.Unavailable,
+    resetIsland: ResetIslandAccess = ResetIslandAccess.Unavailable,
     resetProvider: ResetProvider = NoResets,
     /** Keeps the keys of unsettled redeem attempts across restarts. */
     resetAttempts: ResetAttemptStore = ResetAttemptStore.None,
     /** Where the resets are read in the background. */
     resetScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-    val tileAdder: TileAdder = TileAdder.Unavailable,
+    tileAdder: TileAdder = TileAdder.Unavailable,
     /** What the tile's subtitle shows, or null without a tile (tests). */
-    val tileSettings: TileSettings? = null,
+    tileSettings: TileSettings? = null,
     /** Debug builds' prototype tools; null in release builds. */
-    val prototypes: PrototypeTools? = null,
+    prototypes: PrototypeTools? = null,
     /** The demo accounts, so debug tools can show a scenario such as an expired sign-in. */
-    val demoAccounts: FakeQuotaRepository? = null,
+    demoAccounts: FakeQuotaRepository? = null,
     /** The ZCode sign-in that Z.AI resets need; null without the data layer. */
-    val zCodeSignIn: ZCodeSignIn? = null,
+    zCodeSignIn: ZCodeSignIn? = null,
     /** The resets used and expired, for the Stats tab; redeems in Headroom are recorded here. */
-    val resetEvents: ResetEventLog = ResetEventLog.None,
-) {
-    /** The resets of every account, read through the reset provider. */
-    val resets: ResetCenter =
-        ResetCenter(
-            provider = resetProvider,
-            accounts = quotaRepository.accounts,
-            scope = resetScope,
-            refreshUsage = { accountId -> quotaRepository.refresh(accountId) },
-            recordRedeem = resetEvents::redeemed,
-        )
-
-    /** The keys of unsettled redeem attempts, so a retry never uses a second reset. */
-    val resetMemory: ResetAttemptMemory = ResetAttemptMemory(clock, store = resetAttempts)
-
-    val homeViewModelFactory: ViewModelProvider.Factory = viewModelFactory {
-        initializer {
-            HomeViewModel(
-                repository = quotaRepository,
-                alertPreferences = alertPreferences,
-                clock = clock,
-                isDemo = isDemo,
-                accountsLoaded = accountsLoaded,
-                resetHistory = resetHistory,
-                tickInterval = tickInterval,
-                savedStateHandle = createSavedStateHandle(),
-                quotaDisplay = settings.settings.map { it.quotaDisplay }.distinctUntilChanged(),
-                overviewSort = settings.settings.map { it.overviewSort }.distinctUntilChanged(),
-                saveOverviewSort = settings::setOverviewSort,
-            )
-        }
-    }
-
-    val statsViewModelFactory: ViewModelProvider.Factory = viewModelFactory {
-        initializer {
-            StatsViewModel(
-                repository = quotaRepository,
-                history = usageHistory,
-                isDemo = isDemo,
-                clock = clock,
-                zone = zone,
-                computeDispatcher = statsDispatcher,
-                resetEvents = resetEvents,
-            )
-        }
-    }
-
-    val settingsViewModelFactory: ViewModelProvider.Factory = viewModelFactory {
-        initializer { SettingsViewModel(settings = settings, appVersion = appVersion) }
-    }
-
-    val accountsViewModelFactory: ViewModelProvider.Factory = viewModelFactory {
-        initializer {
-            AccountsViewModel(
-                repository = quotaRepository,
-                signInController = signInController,
-                isDemo = isDemo,
-                renameAccount = renameAccount,
-                removeAccount = removeAccount,
-                reorderAccounts = reorderAccounts,
-            )
-        }
-    }
-
+    resetEvents: ResetEventLog = ResetEventLog.None,
+) :
+    HeadroomUiGraph(
+        quotaRepository = quotaRepository,
+        isDemo = isDemo,
+        accountsLoaded = accountsLoaded,
+        alertPreferences = alertPreferences,
+        clock = clock,
+        zone = TimeZone.of(zone.id),
+        signInController = signInController,
+        widgetPinner = widgetPinner,
+        resetHistory = resetHistory,
+        renameAccount = renameAccount,
+        removeAccount = removeAccount,
+        reorderAccounts = reorderAccounts,
+        tickInterval = tickInterval,
+        settings = settings,
+        appVersion = appVersion,
+        usageHistory = usageHistory,
+        statsDispatcher = statsDispatcher,
+        resetIsland = resetIsland,
+        resetProvider = resetProvider,
+        resetAttempts = resetAttempts,
+        resetScope = resetScope,
+        tileAdder = tileAdder,
+        tileSettings = tileSettings,
+        prototypes = prototypes,
+        demoAccounts = demoAccounts,
+        zCodeSignIn = zCodeSignIn,
+        resetEvents = resetEvents,
+    ) {
     companion object {
         /**
          * Builds the graph. With a [data] graph the app shows the signed-in accounts from the data

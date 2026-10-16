@@ -24,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -44,6 +43,7 @@ import dev.sebastiano.headroom.ui.settings.RowAction
 import dev.sebastiano.headroom.ui.settings.SettingsRow
 import kotlin.time.Instant
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.painterResource
 
 /** Debug builds have the prototype tools. */
 internal val prototypeTools: PrototypeTools? = DebugPrototypeTools

@@ -53,6 +53,11 @@ android {
     }
     // The Play build ships the release code, including what only release builds have.
     sourceSets.getByName("play").kotlin.srcDir("src/release/kotlin")
+    // Android system APIs and legacy UI tests use R IDs from the same canonical shared strings.
+    sourceSets
+        .getByName("main")
+        .res
+        .srcDir(rootProject.file("core/ui/src/commonMain/composeResources"))
     // Only the Play build goes to Google Play.
     playConfigs { register("play") { enabled.set(true) } }
     testOptions {
@@ -88,6 +93,7 @@ dependencies {
     // Keep the app and its instrumented tests on the same version as androidx.test.
     constraints { implementation(libs.androidx.concurrent.futures) }
     implementation(projects.core.data)
+    implementation(projects.core.ui)
     implementation(projects.core.designsystem)
     implementation(projects.widget)
     implementation(libs.androidx.activity.compose)
